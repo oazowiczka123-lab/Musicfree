@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "User photo URL" },
+        "playerControls": { "type": "array", "items": { "type": "string" }, "description": "Custom player control IDs" },
+        "eqSettings": { "type": "object", "description": "Equalizer settings" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Playlist": {
+      "title": "Playlist",
+      "description": "User playlist",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tracks": { "type": "array", "items": { "type": "object" } },
+        "ownerUid": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "ownerUid"]
+    },
+    "LikedSong": {
+      "title": "LikedSong",
+      "description": "User liked song",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "songId": { "type": "string" },
+        "songData": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "songId", "songData"]
+    },
+    "PlaybackEvent": {
+      "title": "PlaybackEvent",
+      "description": "A single playback event for statistics",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "songId": { "type": "string" },
+        "songTitle": { "type": "string" },
+        "artist": { "type": "string" },
+        "genre": { "type": "string" },
+        "duration": { "type": "number", "description": "Duration in seconds" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "songId", "songTitle", "artist", "timestamp"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Publicly visible user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "bio": { "type": "string" },
+        "topGenres": { "type": "array", "items": { "type": "string" } },
+        "isPublic": { "type": "boolean" },
+        "isHistoryPublic": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "isPublic"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile and settings"
+    },
+    "/publicProfiles/{userId}": {
+      "schema": "PublicProfile",
+      "description": "Publicly visible user profiles"
+    },
+    "/users/{userId}/playlists/{playlistId}": {
+      "schema": "Playlist",
+      "description": "User's custom playlists"
+    },
+    "/users/{userId}/likedSongs/{songId}": {
+      "schema": "LikedSong",
+      "description": "User's liked songs for cloud sync"
+    },
+    "/users/{userId}/playbackHistory/{eventId}": {
+      "schema": "PlaybackEvent",
+      "description": "User's playback history for statistics"
+    }
+  }
+}

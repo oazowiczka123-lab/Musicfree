@@ -1,0 +1,5 @@
+{
+  "name": "musicfree",
+  "description": "A personalized music streaming app powered by AI recommendations and YouTube integration.",
+  "requestFramePermissions": []
+}

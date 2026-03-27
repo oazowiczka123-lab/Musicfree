@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Document ID: userId (string)
+    // Fields:
+    //   - uid: string (required) - User ID
+    //   - email: string (required) - User email
+    //   - displayName: string (optional) - User display name
+    //   - photoURL: string (optional) - User photo URL
+    //   - playerControls: list (optional) - Custom player control IDs
+    //   - eqSettings: map (optional) - Equalizer settings
+    //   - createdAt: timestamp (optional) - Creation time
+    //   - updatedAt: timestamp (optional) - Last update time
+    //
+    // Collection: /users/{userId}/playlists/{playlistId}
+    // Document ID: playlistId (string)
+    // Fields:
+    //   - id: string (required) - Playlist ID
+    //   - name: string (required) - Playlist name
+    //   - tracks: list (required) - Tracks in the playlist
+    //   - ownerUid: string (required) - Owner's UID
+    //   - createdAt: timestamp (required) - Creation time
+    //
+    // Collection: /users/{userId}/likedSongs/{songId}
+    // Document ID: songId (string)
+    // Fields:
+    //   - uid: string (required) - User ID
+    //   - songId: string (required) - Song ID
+    //   - songData: map (required) - Song details
+    //   - createdAt: timestamp (required) - Creation time
+    //
+    // Collection: /users/{userId}/playbackHistory/{eventId}
+    // Document ID: eventId (string)
+    // Fields:
+    //   - uid: string (required) - User ID
+    //   - songId: string (required) - Song ID
+    //   - songTitle: string (required) - Song title
+    //   - artist: string (required) - Artist name
+    //   - genre: string (optional) - Genre
+    //   - duration: number (optional) - Duration in seconds
+    //   - timestamp: timestamp (required) - Playback time
+    //
+    // ===============================================================
+
+    // Collection: /publicProfiles/{userId}
+    // Document ID: userId (string)
+    // Fields:
+    //   - uid: string (required) - User ID
+    //   - displayName: string (required) - User display name
+    //   - photoURL: string (optional) - User photo URL
+    //   - bio: string (optional) - User bio
+    //   - topGenres: list (optional) - Top genres
+    //   - isPublic: bool (required) - Is profile public
+    //   - updatedAt: timestamp (optional) - Last update time
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid is string &&
+             data.email is string &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('playerControls' in data) || data.playerControls is list) &&
+             (!('eqSettings' in data) || data.eqSettings is map);
+    }
+
+    function isValidPublicProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'isPublic']) &&
+             data.uid is string &&
+             data.displayName is string &&
+             data.isPublic is bool &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('bio' in data) || data.bio is string) &&
+             (!('topGenres' in data) || data.topGenres is list) &&
+             (!('isHistoryPublic' in data) || data.isHistoryPublic is bool);
+    }
+
+    function isValidPlaylist(data) {
+      return data.keys().hasAll(['id', 'name', 'tracks', 'ownerUid']) &&
+             data.id is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.tracks is list &&
+             data.ownerUid == request.auth.uid &&
+             (!('isPublic' in data) || data.isPublic is bool);
+    }
+
+    function isValidLikedSong(data) {
+      return data.keys().hasAll(['uid', 'songId', 'songData']) &&
+             data.uid == request.auth.uid &&
+             data.songId is string &&
+             data.songData is map;
+    }
+
+    function isValidPlaybackEvent(data) {
+      return data.keys().hasAll(['uid', 'songId', 'songTitle', 'artist', 'timestamp']) &&
+             data.uid == request.auth.uid &&
+             data.songId is string &&
+             data.songTitle is string &&
+             data.artist is string &&
+             data.timestamp is timestamp &&
+             (!('genre' in data) || data.genre is string) &&
+             (!('duration' in data) || data.duration is number);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /publicProfiles/{userId} {
+      allow read: if resource.data.isPublic == true || isOwner(userId);
+      allow create: if isOwner(userId) && isValidPublicProfile(request.resource.data);
+      allow update: if isOwner(userId) && isValidPublicProfile(request.resource.data);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      
+      match /playlists/{playlistId} {
+        allow read: if isOwner(userId) || resource.data.isPublic == true;
+        allow create: if isOwner(userId) && isValidPlaylist(request.resource.data);
+        allow update: if isOwner(userId) && isValidPlaylist(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /likedSongs/{songId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidLikedSong(request.resource.data);
+        allow update: if isOwner(userId) && isValidLikedSong(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /playbackHistory/{eventId} {
+        allow read: if isOwner(userId) || (exists(/databases/$(database)/documents/publicProfiles/$(userId)) && get(/databases/$(database)/documents/publicProfiles/$(userId)).data.isHistoryPublic == true);
+        allow create: if isOwner(userId) && isValidPlaybackEvent(request.resource.data);
+        allow update: if isOwner(userId) && isValidPlaybackEvent(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
